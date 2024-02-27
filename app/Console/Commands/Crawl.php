@@ -32,24 +32,22 @@ class Crawl extends Command
         $arr_article_recommend = [];
         $base_url = 'https://dantri.com.vn';
 
-        $crawler = GoutteFacade::request('GET', $pageUrl);
+        $httpClient = new \GuzzleHttp\Client();
+        $response = $httpClient->get($pageUrl);
+        $htmlString = (string) $response->getBody();
 
-        $crawl_arr = $crawler->filter('body');
-        if ($crawl_arr->count() === 0) {
-            $this->error('No matching elements found on the page. Check if the HTML structure has changed.');
-            return;
-        }
+        $doc = new DOMDocument();
+        // Suppressing errors for loading HTML
+        libxml_use_internal_errors(true);
+        $doc->loadHTML($htmlString);
+        $xpath = new DOMXPath($doc);
 
-        $top_articles = $crawler->filter('.sidebar .article-lot .article-item');
-
-        foreach ($top_articles as $top_article) {
-            if ($top_article instanceof \DOMElement) {
-                $node = new Crawler($top_article);
-            }
-
-            $title = $node->filter('.article-title')->text();
-            $image = optional($node->filter('.article-thumb img')->first())->attr('data-src');
-            $linkHref = $node->filter('.article-thumb a')->attr('href');
+        // XPath query for top articles
+        $topArticlesXPath = $xpath->query('//main/div[2]/div[2]/div[2]/article/article');
+        foreach ($topArticlesXPath as $topArticleXPath) {
+            $title = $xpath->evaluate('string(.//h3[@class="article-title"])', $topArticleXPath);
+            $image = $xpath->evaluate('string(.//div[@class="article-thumb"]/img/@data-src)', $topArticleXPath);
+            $linkHref = $xpath->evaluate('string(.//div[@class="article-thumb"]/a/@href)', $topArticleXPath);
 
             $arr_articles_head[] = [
                 'title' => $title,
@@ -58,17 +56,14 @@ class Crawl extends Command
             ];
         }
 
-        $related_articles_related = $crawler->filter('.article-related .article-item');
+        // XPath query for related articles
+        $relatedArticlesXPath = $xpath->query('/html/body/main/div[2]/div[2]/div[1]/aside/article');
 
-        foreach ($related_articles_related as $related_article) {
-            if ($related_article instanceof \DOMElement) {
-                $node = new Crawler($related_article);
-            }
-
-            $title = $node->filter('.article-title')->text();
-            $description = $node->filter('.article-excerpt a')->text();
-            $image = optional($node->filter('.article-thumb img')->first())->attr('data-src');
-            $linkHref = $node->filter('.article-thumb a')->attr('href');
+        foreach ($relatedArticlesXPath as $relatedArticleXPath) {
+            $title = $xpath->evaluate('string(.//h3[@class="article-title"])', $relatedArticleXPath);
+            $description = $xpath->evaluate('string(.//p[@class="article-excerpt"]/a)', $relatedArticleXPath);
+            $image = $xpath->evaluate('string(.//div[@class="article-thumb"]/img/@data-src)', $relatedArticleXPath);
+            $linkHref = $xpath->evaluate('string(.//div[@class="article-thumb"]/a/@href)', $relatedArticleXPath);
 
             $arr_article_related[] = [
                 'title' => $title,
@@ -78,18 +73,14 @@ class Crawl extends Command
             ];
         }
 
-        $crawl_recommend = $crawler->filter('.article-care');
-        $recommend_articles_items = $crawl_recommend->filter('.article-related .article-item');
+        // XPath query for recommended articles
+        $recommendArticlesXPath = $xpath->query('//main/div[2]/div[2]/div[1]/div[7]/div/div/article');
 
-        foreach ($recommend_articles_items as $recommend_articles_item) {
-            if ($recommend_articles_item instanceof \DOMElement) {
-                $node = new Crawler($recommend_articles_item);
-            }
-
-            $title = $node->filter('.article-title')->text();
-            $description = $node->filter('.article-excerpt a')->text();
-            $image = optional($node->filter('.article-thumb img')->first())->attr('data-src');
-            $linkHref = $node->filter('.article-thumb a')->attr('href');
+        foreach ($recommendArticlesXPath as $recommendArticleXPath) {
+            $title = $xpath->evaluate('string(.//h3[@class="article-title"])', $recommendArticleXPath);
+            $description = $xpath->evaluate('string(.//p[@class="article-excerpt"]/a)', $recommendArticleXPath);
+            $image = $xpath->evaluate('string(.//div[@class="article-thumb"]/img/@data-src)', $recommendArticleXPath);
+            $linkHref = $xpath->evaluate('string(.//div[@class="article-thumb"]/a/@href)', $recommendArticleXPath);
 
             $arr_article_recommend[] = [
                 'title' => $title,
@@ -108,25 +99,5 @@ class Crawl extends Command
 
         echo "\n\nRecommended Articles:\n";
         print_r($arr_article_recommend);
-    }
-
-
-
-    protected function crawlData(string $type, $crawler)
-    {
-        $result = $crawler->filter($type)->first();
-
-        return $result ? $result->text() : '';
-    }
-
-    protected function crawlData_html(string $type, $crawler)
-    {
-        $nodeList = $crawler->filter($type);
-        if ($nodeList->count() === 0) {
-            return '';
-        }
-
-        $result = $nodeList->first();
-        return $result ? $result->html() : '';
     }
 }
